@@ -1,0 +1,24 @@
+GET http://localhost:8000/ctrip/add_task?from_city=成都&to_city=上海&start_day=2025-03-12&end_day=2025-03-13
+
+###
+GET localhost:8000/ctrip/page?page_num=1&page_size=10
+
+
+###
+GET localhost:8000/ctrip/flight_page?task_id=39
+
+###
+GET localhost:8000/ctrip/take
+
+###
+POST localhost:8000/ctrip/complte
+Content-Type: application/json
+
+{
+  "task_id": 2,
+  "if_success": true,
+  "data": {
+    "name": "demo",
+    "age": 20
+  }
+}

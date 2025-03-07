@@ -1,0 +1,13 @@
+[project]
+name = "ctrip-backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "cryptography>=44.0.2",
+    "fastapi[standard]>=0.115.11",
+    "pydash>=8.0.5",
+    "pymysql>=1.1.1",
+    "sqlmodel>=0.0.23",
+]
