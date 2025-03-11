@@ -128,12 +128,8 @@ def flight_page(task_id: int = None,
     }
 
 @router.post("/flight_list")
-def flight_page(query_list : list[FlightListQuery],
+def flight_page(query : FlightListQuery,
                 session: Session = Depends(get_session)):
-    if query_list is None or len(query_list) == 0:
-        return {'code': 400, 'msg': '参数错误'}
-    query = query_list[0]
-
     q = select(CtripFlight).where(CtripFlight.is_latest == True)
 
     if query.cabinClass is not None:
