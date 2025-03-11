@@ -2,7 +2,9 @@ import json
 from datetime import datetime, timedelta
 from typing import List
 
+from openpyxl.utils import get_column_letter
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlmodel import select, desc, func, update, Session
 from fastapi import APIRouter, Query, Depends, Response
 from pydash import get
@@ -12,6 +14,7 @@ from app.crawler import *
 from app.log import logger
 import pandas as pd
 from io import BytesIO
+from app.aichat.flight_chat import get_flight_query_sql, gen_output_by_data
 
 router = APIRouter(prefix="/ctrip", tags=["ctrip"])
 
@@ -157,7 +160,15 @@ def excel_export(task_id: int = None,
     output = BytesIO()
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False)
+        df.to_excel(writer, index=False, sheet_name='Sheet1')
+        worksheet = writer.sheets['Sheet1']
+        for col in df.columns:
+            col_idx = df.columns.get_loc(col) + 1
+            col_letter = get_column_letter(col_idx)
+            if col_letter == 'C':
+                worksheet.column_dimensions[col_letter].width = 50
+            else:
+                worksheet.column_dimensions[col_letter].width = 20
 
     excel_data = output.getvalue()
 
@@ -244,3 +255,14 @@ def complete_task(task_complete: TaskComplete, session: Session = Depends(get_se
                 ))
             session.commit()
     return {'code': 200}
+
+
+@router.get("/chat")
+def get_demo_data(user_input: str, session: Session = Depends(get_session)):
+    flight_query_sql = get_flight_query_sql(user_input)
+    if flight_query_sql is None:
+        return {'code': 500, 'error': '查询失败'}
+    db_result = session.execute(text(flight_query_sql))
+    result_list = db_result.mappings().all()
+    return {'code':200, 'data':gen_output_by_data(user_input, result_list)}
+
