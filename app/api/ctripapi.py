@@ -1,14 +1,17 @@
 import json
 from datetime import datetime, timedelta
+from typing import List
 
 from pydantic import BaseModel
 from sqlmodel import select, desc, func, update, Session
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Query, Depends, Response
 from pydash import get
 from app.database import *
 
 from app.crawler import *
 from app.log import logger
+import pandas as pd
+from io import BytesIO
 
 router = APIRouter(prefix="/ctrip", tags=["ctrip"])
 
@@ -116,6 +119,52 @@ def flight_page(task_id: int = None,
     }
 
 
+@router.get('/excel-export')
+def excel_export(task_id: int = None,
+                 from_city: str = None,
+                 to_city: str = None,
+                 day: str = None,
+                 flight_no: str = None,
+                 session: Session = Depends(get_session)):
+    q = select(CtripFlight).where(CtripFlight.is_latest == True)
+
+    if task_id is not None:
+        q = q.where(CtripFlight.task_id == task_id)
+    if flight_no is not None:
+        q = q.where(CtripFlight.flight_no == flight_no)
+    if from_city is not None:
+        q = q.where(CtripFlight.from_city == from_city)
+    if to_city is not None:
+        q = q.where(CtripFlight.to_city == to_city)
+    if day is not None:
+        q = q.where(CtripFlight.day == datetime.strptime(day, '%Y-%m-%d').date())
+
+    flights: List[CtripFlight] = session.exec(q.order_by(desc(CtripFlight.day))).all()
+
+    df = pd.DataFrame([{
+        'TaskId': it.task_id,
+        '航班号': it.flight_no,
+        '航线': f'{it.from_city}({it.departure_airport_name}) - {it.to_city}({it.arrival_airport_name})',
+        '航班日期': it.day.strftime('%Y-%m-%d'),
+        'MarketAirline': it.airline_name,
+        'OperateAirline': it.operate_airline_name,
+        '机型': it.aircraft_name,
+        '票价': it.adult_price,
+        '折扣': it.discount_rate,
+        'Cabin': it.cabin,
+        'Invoice Type': it.invoice_type
+    } for it in flights])
+    output = BytesIO()
+
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False)
+
+    excel_data = output.getvalue()
+
+    return Response(content=excel_data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": "attachment; filename=output.xlsx"})
+
+
 @router.get("/take")
 def take_task(session: Session = Depends(get_session)):
     task: CtripTask = session.exec(
@@ -142,7 +191,7 @@ class TaskComplete(BaseModel):
 
 @router.post("/complete")
 def complete_task(task_complete: TaskComplete, session: Session = Depends(get_session)):
-    if_success = len(get(task_complete.data, 'flightItineraryList', [])) > 0
+    if_success = len(get(task_complete.data, 'data.flightItineraryList', [])) > 0
     task = session.exec(select(CtripTask).where(CtripTask.id == task_complete.task_id)).one()
     task.status = 'SUCCESS' if if_success else 'FAIL'
     task.process_end_time = datetime.now()
@@ -150,11 +199,11 @@ def complete_task(task_complete: TaskComplete, session: Session = Depends(get_se
     if if_success:
         ctrip_origin_json = CtripOriginJson(task_id=task.id, origin_json=task_complete.data)
         session.add(ctrip_origin_json)
-    session.flush()
+    session.commit()
     session.refresh(task)
 
     if if_success:
-        flights = extract_flight_info_from_origin_data(task_complete.data)
+        flights = extract_flight_info_from_origin_data(task_complete.data.get('data'))
         if flights:
             now = datetime.now()
             session.exec(update(CtripFlight).where((CtripFlight.from_city_code == task.from_city_code) & (

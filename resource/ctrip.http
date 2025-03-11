@@ -1,7 +1,7 @@
 GET http://localhost:8000/ctrip/add_task?from_city=成都&to_city=上海&start_day=2025-03-12&end_day=2025-03-13
 
 ###
-GET localhost:8000/ctrip/page?page_num=1&page_size=10
+GET http://154.201.65.31/ctrip/api/ctrip/page?page_num=1&page_size=10
 
 
 ###
