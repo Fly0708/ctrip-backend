@@ -18,6 +18,12 @@ from app.aichat.flight_chat import get_flight_query_sql, gen_output_by_data
 
 router = APIRouter(prefix="/ctrip", tags=["ctrip"])
 
+class FlightListQuery(BaseModel):
+    depTime: str| None = None
+    depPort: str | None = None
+    arrPort: str | None = None
+    cabinClass:str | None = None
+
 
 @router.get("/city_options")
 def get_city_options():
@@ -119,6 +125,31 @@ def flight_page(task_id: int = None,
             "total_pages": total_pages,
             "data": tasks
         }
+    }
+
+@router.post("/flight_list")
+def flight_page(query_list : list[FlightListQuery],
+                session: Session = Depends(get_session)):
+    if query_list is None or len(query_list) == 0:
+        return {'code': 400, 'msg': '参数错误'}
+    query = query_list[0]
+
+    q = select(CtripFlight).where(CtripFlight.is_latest == True)
+
+    if query.cabinClass is not None:
+        q = q.where(CtripFlight.cabin == query.cabinClass)
+    if query.depPort is not None:
+        q = q.where(CtripFlight.from_city == query.depPort)
+    if query.arrPort is not None:
+        q = q.where(CtripFlight.to_city == query.arrPort)
+    if query.depTime is not None:
+        q = q.where(CtripFlight.day == datetime.strptime(query.depTime, '%Y-%m-%d').date())
+
+    tasks = (session.exec(q.order_by(desc(CtripFlight.day))).all())
+
+    return {
+        'code': 200,
+        'data': tasks
     }
 
 
