@@ -5,7 +5,7 @@ from typing import List
 from openpyxl.utils import get_column_letter
 from pandas.core.computation.expressions import where
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import text, or_
 from sqlmodel import select, desc, func, update, Session
 from fastapi import APIRouter, Query, Depends, Response
 from pydash import get
@@ -143,9 +143,10 @@ def flight_page(query : FlightListQuery,
         q = q.where(CtripFlight.to_city == query.arrPort)
     if query.depTime is not None:
         q = q.where(CtripFlight.day == datetime.strptime(query.depTime, '%Y-%m-%d').date())
-    if query.timeNeed == 'Y':
-        q = (q.where(CtripFlight.arrival_date_time > datetime.combine(today, time(6, 0, 0)))
-             .where(CtripFlight.arrival_date_time < datetime.combine(today, time(22, 0, 0))))
+    if query.timeNeed == 'Y' and query.depTime is not None:
+        dep_day = datetime.strptime(query.depTime, '%Y-%m-%d').date()
+        q = (q.where(or_(CtripFlight.departure_date_time > datetime.combine(dep_day, time(6, 0, 0)), CtripFlight.departure_date_time == None))
+             .where(or_(CtripFlight.departure_date_time < datetime.combine(dep_day, time(22, 0, 0)), CtripFlight.departure_date_time == None)))
 
 
     tasks = (session.exec(q.order_by(desc(CtripFlight.day))).all())
