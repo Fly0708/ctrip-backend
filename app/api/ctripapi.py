@@ -1,8 +1,9 @@
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, time
 from typing import List
 
 from openpyxl.utils import get_column_letter
+from pandas.core.computation.expressions import where
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlmodel import select, desc, func, update, Session
@@ -23,6 +24,7 @@ class FlightListQuery(BaseModel):
     depPort: str | None = None
     arrPort: str | None = None
     cabinClass:str | None = None
+    timeNeed:str | None = 'N'
 
 
 @router.get("/city_options")
@@ -132,6 +134,7 @@ def flight_page(query : FlightListQuery,
                 session: Session = Depends(get_session)):
     q = select(CtripFlight).where(CtripFlight.is_latest == True)
 
+    today = date.today()
     if query.cabinClass is not None:
         q = q.where(CtripFlight.cabin == query.cabinClass)
     if query.depPort is not None:
@@ -140,6 +143,10 @@ def flight_page(query : FlightListQuery,
         q = q.where(CtripFlight.to_city == query.arrPort)
     if query.depTime is not None:
         q = q.where(CtripFlight.day == datetime.strptime(query.depTime, '%Y-%m-%d').date())
+    if query.timeNeed == 'Y':
+        q = (q.where(CtripFlight.arrival_date_time > datetime.combine(today, time(6, 0, 0)))
+             .where(CtripFlight.arrival_date_time < datetime.combine(today, time(22, 0, 0))))
+
 
     tasks = (session.exec(q.order_by(desc(CtripFlight.day))).all())
 
@@ -229,7 +236,7 @@ class TaskComplete(BaseModel):
 
 @router.post("/complete")
 def complete_task(task_complete: TaskComplete, session: Session = Depends(get_session)):
-    if_success = len(get(task_complete.data, 'data.flightItineraryList', [])) > 0
+    if_success = len(get(task_complete.data, 'flightItineraryList', [])) > 0
     task = session.exec(select(CtripTask).where(CtripTask.id == task_complete.task_id)).one()
     task.status = 'SUCCESS' if if_success else 'FAIL'
     task.process_end_time = datetime.now()
@@ -241,7 +248,7 @@ def complete_task(task_complete: TaskComplete, session: Session = Depends(get_se
     session.refresh(task)
 
     if if_success:
-        flights = extract_flight_info_from_origin_data(task_complete.data.get('data'))
+        flights = extract_flight_info_from_origin_data(task_complete.data)
         if flights:
             now = datetime.now()
             session.exec(update(CtripFlight).where((CtripFlight.from_city_code == task.from_city_code) & (
@@ -265,6 +272,8 @@ def complete_task(task_complete: TaskComplete, session: Session = Depends(get_se
                     departure_city_code=flight.departure_city_code,
                     departure_city_name=flight.departure_city_name,
                     departure_airport_name=flight.departure_airport_name,
+                    departure_date_time=flight.departure_date_time,
+                    arrival_date_time=flight.arrival_date_time,
                     arrival_city_name=flight.arrival_city_name,
                     arrival_city_code=flight.arrival_city_code,
                     arrival_airport_name=flight.arrival_airport_name,

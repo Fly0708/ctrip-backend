@@ -49,9 +49,11 @@ class CtripFlight(SQLModel, table=True):
     departure_city_code: str | None
     departure_city_name: str | None
     departure_airport_name: str | None
+    departure_date_time: datetime | None
     arrival_city_name: str | None
     arrival_city_code: str | None
     arrival_airport_name: str | None
+    arrival_date_time: datetime | None
     adult_price: str | None
     invoice_type: str | None
     cabin: str | None

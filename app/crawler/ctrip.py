@@ -16,8 +16,8 @@ def get_city_code_by_city_name(city_name: str) -> str | None:
 Flight = namedtuple('Flight',
                     ['airline_name', 'flight_no', 'aircraft_code', 'aircraft_name', 'operate_airline_name',
                      'departure_city_code', 'departure_city_name',
-                     'departure_airport_name',
-                     'arrival_city_name', 'arrival_city_code', 'arrival_airport_name', 'adult_price', 'invoice_type',
+                     'departure_airport_name', 'departure_date_time',
+                     'arrival_city_name', 'arrival_city_code', 'arrival_airport_name', 'arrival_date_time', 'adult_price', 'invoice_type',
                      'cabin',
                      'discount_rate', 'origin_json'])
 
@@ -48,9 +48,11 @@ def extract_flight_info_from_origin_data(flight_data: dict) -> list[Flight]:
                                departure_city_code=get(flight_part, 'departureCityCode', None),
                                departure_city_name=get(flight_part, 'departureCityName', None),
                                departure_airport_name=get(flight_part, 'departureAirportName', None),
+                               departure_date_time=get(flight_part, 'departureDateTime', None),
                                arrival_city_code=get(flight_part, 'arrivalCityCode', None),
                                arrival_city_name=get(flight_part, 'arrivalCityName', None),
                                arrival_airport_name=get(flight_part, 'arrivalAirportName', None),
+                               arrival_date_time=get(flight_part, 'arrivalDateTime', None),
                                adult_price=get(price_part, 'adultPrice', None),
                                invoice_type=get(price_part, 'invoiceType', None),
                                cabin=get(price_part, 'cabin', None),
